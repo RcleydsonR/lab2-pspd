@@ -18,6 +18,7 @@
 
 var PROTO_PATH = __dirname + '/../protos/finder.proto';
 
+var parseArgs = require('minimist');
 var grpc = require('@grpc/grpc-js');
 var protoLoader = require('@grpc/proto-loader');
 var packageDefinition = protoLoader.loadSync(
@@ -53,9 +54,17 @@ function calculateMinMax(call, callback) {
  * sample server port
  */
 function main() {
+  var argv = parseArgs(process.argv.slice(2));
+  var ipPort;
+  if(argv._[0])
+    ipPort = argv._[0]
+  else
+    ipPort = '127.0.0.1:50051'
+  
+  console.log(ipPort)
   var server = new grpc.Server();
   server.addService(hello_proto.Finder.service, {calculateMinMax: calculateMinMax});
-  server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), () => {
+  server.bindAsync(ipPort, grpc.ServerCredentials.createInsecure(), () => {
     server.start();
   });
 }

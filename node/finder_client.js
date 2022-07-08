@@ -15,6 +15,7 @@
  * limitations under the License.
  *
  */
+const NUMBERS_LENGTH = 500000;
 
 var PROTO_PATH = __dirname + '/../protos/finder.proto';
 
@@ -31,6 +32,35 @@ var packageDefinition = protoLoader.loadSync(
     });
 var finder_proto = grpc.loadPackageDefinition(packageDefinition).finder;
 
+function generateRandomNumbers(qtd){
+  return Array.from({length: qtd},(_, i) => Math.pow(1 - (Math.random()*qtd%qtd)/2, 2))
+}
+
+const distributedService = (client, numberList) => {
+  var min = Infinity, max = -Infinity;
+  var clientSize = client.length
+  var initialNumberIndex = 0;
+
+  indexBase = (NUMBERS_LENGTH / clientSize)
+  var endNumberIndex = indexBase;
+  
+  client.forEach((c, index) => {
+    if(index == clientSize - 1)
+      endNumberIndex = (NUMBERS_LENGTH / clientSize) + (NUMBERS_LENGTH % clientSize)
+
+    c.calculateMinMax({numbers: numberList.slice(initialNumberIndex. endNumberIndex)}, function(err, response) {
+      if(response.min < min) min = response.min
+      if(response.max > max) max = response.max
+    });
+
+    initialNumberIndex += endNumberIndex + 1;
+    endNumberIndex+=indexBase
+  });
+
+  
+  return {min: min, max: max}
+}
+
 function main() {
   var argv = parseArgs(process.argv.slice(2));
 
@@ -41,18 +71,13 @@ function main() {
     target.push('localhost:50051');
   }
 
-  let randomNumbers = generateRandomNumbers(500000)
+  let randomNumbers = generateRandomNumbers(NUMBERS_LENGTH)
 
-  var client = new finder_proto.Finder(target[0],
-                                       grpc.credentials.createInsecure());
+  var clientList = []
+  clientList = target.map(ipPort => (new finder_proto.Finder(ipPort, grpc.credentials.createInsecure())))
   
-  client.calculateMinMax({numbers: randomNumbers}, function(err, response) {
-    console.log('Menor: ', response.min.toFixed(3), '\nMaior: ', response.max.toFixed(3));
-  });
-}
-
-function generateRandomNumbers(qtd){
-  return Array.from({length: qtd},(_, i) => Math.pow(1 - (Math.random()*qtd%qtd)/2, 2))
+  var result = distributedService(clientList, randomNumbers)
+  console.log('Menor: ', result.min.toFixed(3), '\nMaior: ', result.max.toFixed(3));
 }
 
 main();
