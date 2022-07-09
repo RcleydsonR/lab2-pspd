@@ -16,37 +16,37 @@
  *
  */
 
-var PROTO_PATH = __dirname + '/../protos/finder.proto';
+var PROTO_PATH = __dirname + "/../protos/finder.proto";
 
-var parseArgs = require('minimist');
-var grpc = require('@grpc/grpc-js');
-var protoLoader = require('@grpc/proto-loader');
-var packageDefinition = protoLoader.loadSync(
-    PROTO_PATH,
-    {keepCase: true,
-     longs: String,
-     enums: String,
-     defaults: true,
-     oneofs: true
-    });
+var parseArgs = require("minimist");
+var grpc = require("@grpc/grpc-js");
+var protoLoader = require("@grpc/proto-loader");
+var packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
 var hello_proto = grpc.loadPackageDefinition(packageDefinition).finder;
 
-const findMinMax = ((numberList) => {
-  var min = Infinity
-  var max = -Infinity
-  numberList.forEach(element => {
-    if(element < min) min = element
-    if(element > max) max = element
+const findMinMax = (numberList) => {
+  var min = Infinity;
+  var max = -Infinity;
+  numberList.forEach((element) => {
+    if (element < min) min = element;
+    if (element > max) max = element;
   });
-  return [min, max]
-})
+  return [min, max];
+};
 
 /**
  * Implements the SayHello RPC method.
  */
 function calculateMinMax(call, callback) {
-  let minMax = findMinMax(call.request.numbers)
-  callback(null, {min: minMax[0], max: minMax[1]});
+  console.log("Números recebidos com sucesso!");
+  let minMax = findMinMax(call.request.numbers);
+  callback(null, { min: minMax[0], max: minMax[1] });
 }
 
 /**
@@ -56,14 +56,13 @@ function calculateMinMax(call, callback) {
 function main() {
   var argv = parseArgs(process.argv.slice(2));
   var ipPort;
-  if(argv._[0])
-    ipPort = argv._[0]
-  else
-    ipPort = '127.0.0.1:50051'
-  
-  console.log(ipPort)
+  if (argv._[0]) ipPort = argv._[0];
+  else ipPort = "127.0.0.1:50051";
+
   var server = new grpc.Server();
-  server.addService(hello_proto.Finder.service, {calculateMinMax: calculateMinMax});
+  server.addService(hello_proto.Finder.service, {
+    calculateMinMax: calculateMinMax,
+  });
   server.bindAsync(ipPort, grpc.ServerCredentials.createInsecure(), () => {
     server.start();
   });

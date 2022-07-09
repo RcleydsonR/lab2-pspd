@@ -17,67 +17,104 @@
  */
 const NUMBERS_LENGTH = 500000;
 
-var PROTO_PATH = __dirname + '/../protos/finder.proto';
+var PROTO_PATH = __dirname + "/../protos/finder.proto";
 
-var parseArgs = require('minimist');
-var grpc = require('@grpc/grpc-js');
-var protoLoader = require('@grpc/proto-loader');
-var packageDefinition = protoLoader.loadSync(
-    PROTO_PATH,
-    {keepCase: true,
-     longs: String,
-     enums: String,
-     defaults: true,
-     oneofs: true
-    });
+var parseArgs = require("minimist");
+var grpc = require("@grpc/grpc-js");
+const { Worker, isMainThread, parentPort } = require("worker_threads");
+var protoLoader = require("@grpc/proto-loader");
+var packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true,
+});
 var finder_proto = grpc.loadPackageDefinition(packageDefinition).finder;
 
-function generateRandomNumbers(qtd){
-  return Array.from({length: qtd},(_, i) => Math.pow(1 - (Math.random()*qtd%qtd)/2, 2))
+function generateRandomNumbers(qtd) {
+  return Array.from({ length: qtd }, (_, i) =>
+    Math.pow(1 - ((Math.random() * qtd) % qtd) / 2, 2)
+  );
 }
 
-const distributedService = (client, numberList) => {
-  var min = Infinity, max = -Infinity;
-  var clientSize = client.length
+function distributedService(client, numberList) {
+  var min = Infinity,
+    max = -Infinity;
+  var clientSize = client.length;
   var initialNumberIndex = 0;
+  const final = [];
+  let finishedWorkers = 0;
 
-  indexBase = (NUMBERS_LENGTH / clientSize)
+  indexBase = Math.floor(NUMBERS_LENGTH / clientSize);
   var endNumberIndex = indexBase;
-  
-  client.forEach((c, index) => {
-    if(index == clientSize - 1)
-      endNumberIndex = (NUMBERS_LENGTH / clientSize) + (NUMBERS_LENGTH % clientSize)
 
-    c.calculateMinMax({numbers: numberList.slice(initialNumberIndex. endNumberIndex)}, function(err, response) {
-      if(response.min < min) min = response.min
-      if(response.max > max) max = response.max
+  client.forEach((c, index) => {
+    if (index == clientSize - 1) endNumberIndex = NUMBERS_LENGTH;
+
+    const worker = new Worker(__filename);
+    worker.once("message", (message) => {
+      if (message.min < min) min = message.min;
+      if (message.max > max) max = message.max;
+      finishedWorkers++;
+      if (finishedWorkers === clientSize)
+        console.log("Menor: ", min.toFixed(3), "\nMaior: ", max.toFixed(3));
+    });
+    worker.on("error", console.error);
+    console.log(
+      `worker "${c}" inicio "${initialNumberIndex}" fim "${endNumberIndex}"`
+    );
+
+    worker.postMessage({
+      ipPort: c,
+      numbers: numberList.slice(initialNumberIndex, endNumberIndex),
     });
 
-    initialNumberIndex += endNumberIndex + 1;
-    endNumberIndex+=indexBase
+    initialNumberIndex = endNumberIndex + 1;
+    endNumberIndex += indexBase;
   });
-
-  
-  return {min: min, max: max}
 }
 
 function main() {
-  var argv = parseArgs(process.argv.slice(2));
+  if (isMainThread) {
+    var argv = parseArgs(process.argv.slice(2));
 
-  var target = [];
-  if (argv._.length > 0) {
-    target = argv._; 
+    var target = [];
+    if (argv._.length > 0) {
+      target = argv._;
+    } else {
+      target.push("localhost:50051");
+    }
+
+    const randomNumbers = generateRandomNumbers(NUMBERS_LENGTH);
+
+    var result = distributedService(target, randomNumbers);
+
+    // console.log(
+    //   "Menor: ",
+    //   result.min.toFixed(3),
+    //   "\nMaior: ",
+    //   result.max.toFixed(3)
+    // );
   } else {
-    target.push('localhost:50051');
+    parentPort.once("message", (message) => {
+      const numbers = message.numbers;
+
+      const client = new finder_proto.Finder(
+        message.ipPort,
+        grpc.credentials.createInsecure()
+      );
+
+      client.calculateMinMax(
+        {
+          numbers: numbers,
+        },
+        function (err, response) {
+          parentPort.postMessage({ min: response.min, max: response.max });
+        }
+      );
+    });
   }
-
-  let randomNumbers = generateRandomNumbers(NUMBERS_LENGTH)
-
-  var clientList = []
-  clientList = target.map(ipPort => (new finder_proto.Finder(ipPort, grpc.credentials.createInsecure())))
-  
-  var result = distributedService(clientList, randomNumbers)
-  console.log('Menor: ', result.min.toFixed(3), '\nMaior: ', result.max.toFixed(3));
 }
 
 main();
