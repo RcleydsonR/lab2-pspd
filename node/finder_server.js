@@ -41,7 +41,7 @@ const findMinMax = (numberList) => {
 };
 
 /**
- * Implements the SayHello RPC method.
+ * Implements the CalculateMinMax RPC method.
  */
 function calculateMinMax(call, callback) {
   console.log("Números recebidos com sucesso!");
@@ -50,7 +50,7 @@ function calculateMinMax(call, callback) {
 }
 
 /**
- * Starts an RPC server that receives requests for the Greeter service at the
+ * Starts an RPC server that receives requests for the Finder service at the
  * sample server port
  */
 function main() {

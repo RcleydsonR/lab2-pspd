@@ -15,24 +15,24 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "io.grpc.examples.helloworld";
-option java_outer_classname = "HelloWorldProto";
-option objc_class_prefix = "HLW";
+option java_package = "io.grpc.examples.finder";
+option java_outer_classname = "FinderProto";
+option objc_class_prefix = "FND";
 
 package finder;
 
-// The greeting service definition.
+// The finding service definition.
 service Finder {
-  // Sends a greeting
+  // Sends calculated numbers
   rpc CalculateMinMax (NumbersRequest) returns (NumbersReply) {}
 }
 
-// The request message containing the user's name.
+// The request message containing the float numbers.
 message NumbersRequest {
   repeated float numbers = 1;
 }
 
-// The response message containing the greetings
+// The response message containing the min and max numbers from the float vector.
 message NumbersReply {
   float min = 1;
   float max = 2;
